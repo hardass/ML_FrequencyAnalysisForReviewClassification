@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
+	"unicode"
 )
 
 // type Word struct {
@@ -64,8 +66,12 @@ func ReadPracticeData() {
 		if flag == io.EOF {
 			break
 		}
-		fmt.Println("Line ", i, ": ", string(line))
-		fmt.Println(line)
+		sen := string(line)
+		fmt.Println("Line ", i, ": ", sen)
+		notALetter := func(char rune) bool { return !unicode.IsLetter(char) }
+		for j, word := range strings.FieldsFunc(sen, notALetter) {
+			fmt.Println("word #", j, ": ", word)
+		}
 	}
 
 }
