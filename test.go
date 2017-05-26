@@ -60,18 +60,45 @@ func ReadPracticeData() {
 	Check(err, "practice file cannot be loaded")
 	defer practiceFile.Close()
 
+	notALetter := func(char rune) bool { return !unicode.IsLetter(char) }
+	words_map = make(map[string][][2]int)
+
 	br := bufio.NewReader(practiceFile)
 	for i := 0; ; i++ {
 		line, _, flag := br.ReadLine()
 		if flag == io.EOF {
 			break
 		}
-		sen := string(line)
-		fmt.Println("Line ", i, ": ", sen)
-		notALetter := func(char rune) bool { return !unicode.IsLetter(char) }
-		for j, word := range strings.FieldsFunc(sen, notALetter) {
-			fmt.Println("word #", j, ": ", word)
+
+		//read a paragragh
+		para := string(line)
+		fmt.Println("Para ", i, ": ", para)
+
+		//read the paragragh's class
+		class := strings.IndexFunc(para, unicode.IsSpace)
+		fmt.Println("class: ", para[:class])
+		// sentences[i][0] = para[:class]
+		currentSentence := []string{para[:class]}
+
+		for j, sen := range strings.Split(para, ",") {
+			//read sentence
+			fmt.Println("Sen ", j+1, ": ", sen)
+			//finish sentences construction
+			// sentences[i][j+1] = sen
+			currentSentence = append(currentSentence, sen)
+
+			for k, word := range strings.FieldsFunc(sen, notALetter) {
+				//read word
+				fmt.Println("word #", k, ": ", word)
+				//finish word_map construction
+				words_map[word] = append(words_map[word], [][2]int{{i}, {j + 1}}...)
+			}
 		}
+		sentences = append(sentences, currentSentence)
+	}
+
+	for key, value := range words_map {
+		fmt.Printf("%s : %d\n", key, value)
 	}
 
 }
@@ -79,11 +106,13 @@ func ReadPracticeData() {
 func test() {
 	fmt.Println("test start")
 	////append 2 slice
-	words_map = map[string][][2]int{
-		"a": {{0, 1}, {1, 1}, {2, 2}},
-		"b": {{0, 2}, {1, 3}, {1, 4}},
-	}
-	words_map["a"] = append(words_map["a"], [][2]int{{3, 3}}...)
+	// words_map = map[string][][2]int{
+	// 	"a": {{0, 1}, {1, 1}, {2, 2}},
+	// 	"b": {{0, 2}, {1, 3}, {1, 4}},
+	// }
+
+	words_map = make(map[string][][2]int)
+	words_map["c"] = append(words_map["c"], [][2]int{{3, 3}}...)
 
 	fmt.Println(words_map["a"])
 	for key, value := range words_map {
@@ -111,4 +140,17 @@ func test() {
 	}
 	fmt.Println("frist line is: ", scanner.Text())
 	////
+
+	////append to 2 slices
+	var slices [][]int
+	for i := 0; i < 5; i++ {
+		s1 := []int{3}
+		for j := 0; j < 3; j++ {
+			s1 = append(s1, 6)
+		}
+		slices = append(slices, s1)
+	}
+	fmt.Println(slices)
+	////
+
 }
