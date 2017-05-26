@@ -77,7 +77,6 @@ func ReadPracticeData() {
 		//read the paragragh's class
 		class := strings.IndexFunc(para, unicode.IsSpace)
 		fmt.Println("class: ", para[:class])
-		// sentences[i][0] = para[:class]
 		currentSentence := []string{para[:class]}
 
 		for j, sen := range strings.Split(para, ",") {
@@ -87,11 +86,10 @@ func ReadPracticeData() {
 			// sentences[i][j+1] = sen
 			currentSentence = append(currentSentence, sen)
 
-			for k, word := range strings.FieldsFunc(sen, notALetter) {
+			for _, word := range strings.FieldsFunc(sen, notALetter) {
 				//read word
-				fmt.Println("word #", k, ": ", word)
 				//finish word_map construction
-				words_map[word] = append(words_map[word], [][2]int{{i}, {j + 1}}...)
+				words_map[word] = append(words_map[word], [][2]int{{i, j + 1}}...)
 			}
 		}
 		sentences = append(sentences, currentSentence)
