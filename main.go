@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/gob"
 	"fmt"
 	"io"
 	"os"
@@ -35,16 +36,61 @@ var sentences [][]string
 // Paragraph 0's class is 3, has sentences 1 and 2;
 // Paragraph 1's class is 1, has sentences 1, 2 and 3;
 
+type GobShell struct {
+	Words_map map[string][][2]int
+	Sentences [][]string
+}
+
+var gobFileName string = "trainingdata.gob"
+
 func main() {
 	fmt.Println("Program Start...")
 
-	// test
-	// test()
+	// if train data stuct file exists, load data directly; else read original train txt file and save to data struct file
+	_, err := os.Stat(gobFileName)
+	if err != nil && os.IsNotExist(err) {
+		// read practice data from train.txt
+		ReadPracticeData()
 
-	// read practice data from train.txt
-	ReadPracticeData()
+		// persistence of train data as structure
+		gobShellSave := GobShell{Words_map: words_map, Sentences: sentences}
+		SaveTrainingDataStruct(gobFileName, gobShellSave)
+		fmt.Println("doesn't exist")
+	} else {
+		// load train data structure from file
+		gobShellload := new(GobShell)
+		LoadTrainDataStruct(gobFileName, gobShellload)
+		words_map = gobShellload.Words_map
+		sentences = gobShellload.Sentences
+		fmt.Println("exists")
+	}
+
+	// fmt.Println(words_mapload)
+	fmt.Println(sentences)
+
+	for key, value := range words_map {
+		fmt.Printf("%s : %d\n", key, value)
+	}
 
 	fmt.Println("Program End...")
+}
+
+func LoadTrainDataStruct(file string, v interface{}) {
+	loadFile, err := os.Open(file)
+	Check(err, "cannot load saved file")
+	defer loadFile.Close()
+	decoder := gob.NewDecoder(loadFile)
+	err = decoder.Decode(v)
+	Check(err, "error in decoding from saved file")
+}
+
+func SaveTrainingDataStruct(file string, v interface{}) {
+	saveFile, err := os.Create(file)
+	Check(err, "save file cannot be created")
+	defer saveFile.Close()
+	encoder := gob.NewEncoder(saveFile)
+	err = encoder.Encode(v)
+	Check(err, "error in encoding to save file")
 }
 
 func Check(err error, log string) {
@@ -72,16 +118,16 @@ func ReadPracticeData() {
 
 		//read a paragragh
 		para := string(line)
-		fmt.Println("Para ", i, ": ", para)
+		// fmt.Println("Para ", i, ": ", para)
 
 		//read the paragragh's class
 		class := strings.IndexFunc(para, unicode.IsSpace)
-		fmt.Println("class: ", para[:class])
+		// fmt.Println("class: ", para[:class])
 		currentSentence := []string{para[:class]}
 
 		for j, sen := range strings.Split(para, ",") {
 			//read sentence
-			fmt.Println("Sen ", j+1, ": ", sen)
+			// fmt.Println("Sen ", j+1, ": ", sen)
 			//finish sentences construction
 			// sentences[i][j+1] = sen
 			currentSentence = append(currentSentence, sen)
@@ -95,8 +141,7 @@ func ReadPracticeData() {
 		sentences = append(sentences, currentSentence)
 	}
 
-	for key, value := range words_map {
-		fmt.Printf("%s : %d\n", key, value)
-	}
-
+	// for key, value := range words_map {
+	// 	fmt.Printf("%s : %d\n", key, value)
+	// }
 }
