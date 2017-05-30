@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
 	"unicode"
 )
@@ -36,6 +37,26 @@ var sentences [][]string
 // Paragraph 0's class is 3, has sentences 1 and 2;
 // Paragraph 1's class is 1, has sentences 1, 2 and 3;
 
+type Word struct {
+	Name       string
+	Frequency  int
+	RateOfFreq float32
+}
+
+type SorterWordFrequency []Word
+
+func (sort SorterWordFrequency) Len() int {
+	return int(len(sort))
+}
+func (sorter SorterWordFrequency) Less(i, j int) bool {
+	return sorter[i].Frequency < sorter[j].Frequency
+}
+func (sorter SorterWordFrequency) Swap(i, j int) {
+	sorter[i], sorter[j] = sorter[j], sorter[i]
+}
+
+// var words_analysis_map map[string]Word
+
 type GobShell struct {
 	Words_map map[string][][2]int
 	Sentences [][]string
@@ -43,9 +64,48 @@ type GobShell struct {
 
 var gobFileName string = "trainingdata.gob"
 
+var debug bool = false
+
 func main() {
 	fmt.Println("Program Start...")
 
+	// base data initialization
+	InitializeBaseData()
+
+	// analysis words requency
+	WordsAnalysis()
+
+	fmt.Println("Program End...")
+}
+
+func WordsAnalysis() {
+	var totalWordsCount int = 0
+	for _, value := range words_map {
+		totalWordsCount = totalWordsCount + len(value)
+
+	}
+	fmt.Println(totalWordsCount)
+
+	// words_analysis_map = make(map[string]Word)
+	var words_sort_frequency SorterWordFrequency
+
+	for key, value := range words_map {
+		// words_analysis_map[key] = Word{Frequency: int32(len(value)), RateOfFreq: float32(len(value)) / float32(totalWordsCount)}
+		words_sort_frequency = append(words_sort_frequency, Word{Name: key, Frequency: len(value), RateOfFreq: float32(len(value)) / float32(totalWordsCount)})
+	}
+	sort.Sort(sort.Reverse(words_sort_frequency))
+	// sort.Reverse(words_sort_frequency)
+
+	// for key, value := range words_analysis_map {
+	// 	fmt.Printf("%s : %d : %.19f \n", key, value.Frequency, value.RateOfFreq)
+	// }
+
+	for i, word := range words_sort_frequency {
+		fmt.Printf("No. %d: %s : %d : %.19f \n", i, word.Name, word.Frequency, word.RateOfFreq)
+	}
+}
+
+func InitializeBaseData() {
 	// if train data stuct file exists, load data directly; else read original train txt file and save to data struct file
 	_, err := os.Stat(gobFileName)
 	if err != nil && os.IsNotExist(err) {
@@ -66,13 +126,13 @@ func main() {
 	}
 
 	// fmt.Println(words_mapload)
-	fmt.Println(sentences)
+	if debug {
+		fmt.Println(sentences)
 
-	for key, value := range words_map {
-		fmt.Printf("%s : %d\n", key, value)
+		for key, value := range words_map {
+			fmt.Printf("%s : %d\n", key, value)
+		}
 	}
-
-	fmt.Println("Program End...")
 }
 
 func LoadTrainDataStruct(file string, v interface{}) {
@@ -102,7 +162,7 @@ func Check(err error, log string) {
 
 func ReadPracticeData() {
 	// practiceFile, err := ioutil.ReadFile("train.txt")
-	practiceFile, err := os.Open("train.txt")
+	practiceFile, err := os.Open("train.full.txt")
 	Check(err, "practice file cannot be loaded")
 	defer practiceFile.Close()
 
