@@ -5,8 +5,10 @@ import (
 	"encoding/gob"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -38,24 +40,25 @@ var sentences [][]string
 // Paragraph 1's class is 1, has sentences 1, 2 and 3;
 
 type Word struct {
-	Name       string
-	Frequency  int
-	RateOfFreq float32
+	Name           string
+	Frequency      int
+	RateOfFreq     float32
+	Class_Average  float32
+	Class_Variance float32
 }
 
-type SorterWordFrequency []Word
+type Words []Word
 
-func (sort SorterWordFrequency) Len() int {
+func (sort Words) Len() int {
 	return int(len(sort))
 }
-func (sorter SorterWordFrequency) Less(i, j int) bool {
-	return sorter[i].Frequency < sorter[j].Frequency
+func (sorter Words) Less(i, j int) bool {
+	// return sorter[i].Frequency < sorter[j].Frequency
+	return sorter[i].Class_Variance < sorter[j].Class_Variance
 }
-func (sorter SorterWordFrequency) Swap(i, j int) {
+func (sorter Words) Swap(i, j int) {
 	sorter[i], sorter[j] = sorter[j], sorter[i]
 }
-
-// var words_analysis_map map[string]Word
 
 type GobShell struct {
 	Words_map map[string][][2]int
@@ -84,24 +87,41 @@ func WordsAnalysis() {
 		totalWordsCount = totalWordsCount + len(value)
 
 	}
-	fmt.Println(totalWordsCount)
+	fmt.Println("total words:", totalWordsCount)
 
-	// words_analysis_map = make(map[string]Word)
-	var words_sort_frequency SorterWordFrequency
-
-	for key, value := range words_map {
-		// words_analysis_map[key] = Word{Frequency: int32(len(value)), RateOfFreq: float32(len(value)) / float32(totalWordsCount)}
-		words_sort_frequency = append(words_sort_frequency, Word{Name: key, Frequency: len(value), RateOfFreq: float32(len(value)) / float32(totalWordsCount)})
+	var overallAverageClass float32 = 0
+	for i, _ := range sentences {
+		class, _ := strconv.Atoi(sentences[i][0])
+		overallAverageClass = overallAverageClass + float32(class)
 	}
-	sort.Sort(sort.Reverse(words_sort_frequency))
-	// sort.Reverse(words_sort_frequency)
+	overallAverageClass = overallAverageClass / float32(len(sentences))
+	fmt.Println("overall average class:", overallAverageClass)
 
-	// for key, value := range words_analysis_map {
-	// 	fmt.Printf("%s : %d : %.19f \n", key, value.Frequency, value.RateOfFreq)
-	// }
+	var words Words
 
-	for i, word := range words_sort_frequency {
-		fmt.Printf("No. %d: %s : %d : %.19f \n", i, word.Name, word.Frequency, word.RateOfFreq)
+	// update how many times a word appears in whole training data set, and its percentage
+	for key, value := range words_map {
+		words = append(words, Word{Name: key, Frequency: len(value), RateOfFreq: float32(len(value)) / float32(totalWordsCount)})
+	}
+
+	// update the average of paragraph's classes containing the word
+	for i, word := range words {
+		// get [][2]int of each word
+		v, _ := words_map[word.Name]
+
+		var sum int = 0
+		for _, p := range v {
+			class, _ := strconv.Atoi(sentences[p[0]][0])
+			sum = sum + class
+		}
+		words[i].Class_Average = float32(sum) / float32(len(v))
+		// update variance of each word
+		words[i].Class_Variance = float32(math.Pow(float64(words[i].Class_Average-overallAverageClass), 2))
+	}
+
+	sort.Sort(sort.Reverse(words))
+	for i, word := range words {
+		fmt.Printf("#.%d: %s : %d : %.19f : %.9f : %.9f\n", i, word.Name, word.Frequency, word.RateOfFreq, word.Class_Average, word.Class_Variance)
 	}
 }
 
@@ -115,14 +135,14 @@ func InitializeBaseData() {
 		// persistence of train data as structure
 		gobShellSave := GobShell{Words_map: words_map, Sentences: sentences}
 		SaveTrainingDataStruct(gobFileName, gobShellSave)
-		fmt.Println("doesn't exist")
+		fmt.Println("pre-loaded file doesn't exist")
 	} else {
 		// load train data structure from file
 		gobShellload := new(GobShell)
 		LoadTrainDataStruct(gobFileName, gobShellload)
 		words_map = gobShellload.Words_map
 		sentences = gobShellload.Sentences
-		fmt.Println("exists")
+		fmt.Println("pre-loaded file exists")
 	}
 
 	// fmt.Println(words_mapload)
