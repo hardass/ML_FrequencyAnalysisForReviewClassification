@@ -45,6 +45,7 @@ type Word struct {
 	RateOfFreq     float32
 	Class_Average  float32
 	Class_Variance float32
+	Weight         float32
 }
 
 type Words []Word
@@ -54,7 +55,8 @@ func (sort Words) Len() int {
 }
 func (sorter Words) Less(i, j int) bool {
 	// return sorter[i].Frequency < sorter[j].Frequency
-	return sorter[i].Class_Variance < sorter[j].Class_Variance
+	// return sorter[i].Class_Variance < sorter[j].Class_Variance
+	return sorter[i].Weight < sorter[j].Weight
 }
 func (sorter Words) Swap(i, j int) {
 	sorter[i], sorter[j] = sorter[j], sorter[i]
@@ -117,11 +119,13 @@ func WordsAnalysis() {
 		words[i].Class_Average = float32(sum) / float32(len(v))
 		// update variance of each word
 		words[i].Class_Variance = float32(math.Pow(float64(words[i].Class_Average-overallAverageClass), 2))
+
+		words[i].Weight = words[i].Class_Variance * words[i].RateOfFreq
 	}
 
 	sort.Sort(sort.Reverse(words))
 	for i, word := range words {
-		fmt.Printf("#.%d: %s : %d : %.19f : %.9f : %.9f\n", i, word.Name, word.Frequency, word.RateOfFreq, word.Class_Average, word.Class_Variance)
+		fmt.Printf("#.%d: %s : %d : %.19f : %.9f : %.9f : %.9f\n", i, word.Name, word.Frequency, word.RateOfFreq, word.Class_Average, word.Class_Variance, word.Weight)
 	}
 }
 
@@ -215,6 +219,8 @@ func ReadPracticeData() {
 			for _, word := range strings.FieldsFunc(sen, notALetter) {
 				//read word
 				//finish word_map construction
+				//convert word to lower case
+				word = strings.ToLower(word)
 				words_map[word] = append(words_map[word], [][2]int{{i, j + 1}}...)
 			}
 		}
