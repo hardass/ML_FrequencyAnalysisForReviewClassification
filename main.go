@@ -62,12 +62,16 @@ func (sorter Words) Swap(i, j int) {
 	sorter[i], sorter[j] = sorter[j], sorter[i]
 }
 
+var words_post_analysis_map map[string]Word
+
 type GobShell struct {
 	Words_map map[string][][2]int
 	Sentences [][]string
 }
 
 var gobFileName string = "trainingdata.gob"
+var verificationFileName string = "dev.txt"
+var verificationResultFileName string = "dev_result.txt"
 
 var debug bool = false
 
@@ -80,7 +84,105 @@ func main() {
 	// analysis words requency
 	WordsAnalysis()
 
+	// result verification
+	Verification()
+
 	fmt.Println("Program End...")
+}
+
+func Verification() {
+	verificationFile, err := os.Open(verificationFileName)
+	Check(err, "verification file could not be opened")
+	defer verificationFile.Close()
+
+	notALetter := func(char rune) bool { return !unicode.IsLetter(char) }
+	// var output []string
+	type Output struct {
+		Class   float64
+		Content string
+	}
+	output := []Output{}
+	var verificationResultClass []float64
+
+	br := bufio.NewReader(verificationFile)
+	for i := 0; ; i++ {
+		line, _, flag := br.ReadLine()
+		if flag == io.EOF {
+			break
+		}
+
+		para := string(line)
+
+		var class float32 = 0
+		var match int = 0
+
+		for _, word := range strings.FieldsFunc(para, notALetter) {
+			word = strings.ToLower(word)
+
+			if word_post_analysis, ok := words_post_analysis_map[word]; ok {
+				class += word_post_analysis.Class_Average
+				match++
+			}
+		}
+		// output = append(output, strconv.FormatFloat(float64(class)/float64(match), 'f', 2, 32)+" "+para)
+		verificationResultClass = append(verificationResultClass, float64(class)/float64(match))
+		output = append(output, Output{Class: float64(class) / float64(match), Content: para})
+	}
+
+	// analysis training data's class distribution
+	var trainingDataClassSatatic [5]int
+	for i, _ := range sentences {
+		j, _ := strconv.Atoi(sentences[i][0])
+		switch j {
+		case 0:
+			trainingDataClassSatatic[0]++
+		case 1:
+			trainingDataClassSatatic[1]++
+		case 2:
+			trainingDataClassSatatic[2]++
+		case 3:
+			trainingDataClassSatatic[3]++
+		case 4:
+			trainingDataClassSatatic[4]++
+		}
+	}
+	fmt.Println(trainingDataClassSatatic)
+	// e.g. [1082 2228 1621 2328 1285]
+	var trainingDataClassPercentage [5]float64
+	for i, _ := range trainingDataClassSatatic {
+		trainingDataClassPercentage[i] = float64(trainingDataClassSatatic[i]) / float64(len(sentences))
+	}
+	fmt.Println(trainingDataClassPercentage)
+	// e.g. [0.1266385767790262 0.2607677902621723 0.1897237827715356 0.27247191011235955 0.15039794007490637]
+	// calculate class thresholds
+	sort.Float64s(verificationResultClass)
+	// fmt.Println(verificationResultClass)
+	var classThreshods [5]float64
+	var p float64
+	for i, _ := range trainingDataClassPercentage {
+		p += trainingDataClassPercentage[i]
+		classThreshods[i] = verificationResultClass[int(float64(len(verificationResultClass))*p)]
+	}
+	fmt.Println(classThreshods)
+	// e.g. [1.851025644938151 2.0055873870849608 2.0936654743395353 2.272305443173363 2.8736173629760744]
+	for i, _ := range output {
+		switch {
+		case output[i].Class < classThreshods[0]:
+			output[i].Content = "0 " + output[i].Content
+		case output[i].Class < classThreshods[1]:
+			output[i].Content = "1 " + output[i].Content
+		case output[i].Class < classThreshods[2]:
+			output[i].Content = "2 " + output[i].Content
+		case output[i].Class < classThreshods[3]:
+			output[i].Content = "3 " + output[i].Content
+		default:
+			output[i].Content = "4 " + output[i].Content
+
+		}
+	}
+	for _, s := range output {
+		fmt.Println(s.Content)
+	}
 }
 
 func WordsAnalysis() {
@@ -100,6 +202,7 @@ func WordsAnalysis() {
 	fmt.Println("overall average class:", overallAverageClass)
 
 	var words Words
+	words_post_analysis_map = make(map[string]Word)
 
 	// update how many times a word appears in whole training data set, and its percentage
 	for key, value := range words_map {
@@ -121,12 +224,15 @@ func WordsAnalysis() {
 		words[i].Class_Variance = float32(math.Pow(float64(words[i].Class_Average-overallAverageClass), 2))
 
 		words[i].Weight = words[i].Class_Variance * words[i].RateOfFreq
+
+		// write to post analysis word map
+		words_post_analysis_map[words[i].Name] = words[i]
 	}
 
 	sort.Sort(sort.Reverse(words))
-	for i, word := range words {
-		fmt.Printf("#.%d: %s : %d : %.19f : %.9f : %.9f : %.9f\n", i, word.Name, word.Frequency, word.RateOfFreq, word.Class_Average, word.Class_Variance, word.Weight)
-	}
+	// for i, word := range words {
+	// 	fmt.Printf("#.%d: %s , %d , %.9f , %.9f , %.9f , %.9f\n", i, word.Name, word.Frequency, word.RateOfFreq, word.Class_Average, word.Class_Variance, word.Weight)
+	// }
 }
 
 func InitializeBaseData() {
