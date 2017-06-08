@@ -29,7 +29,7 @@ var words_map map[string][][2]int
 // 	"bad": {{0, 2}, {1, 3}, {1, 4}}, <- word of "bad" appears in #0p's #2s, and #1p's #3s, and #1p's #4s
 // }
 
-var sentences [][]string
+var trainingSentences [][]string
 
 // {
 // 	{"3","s1","s2"},
@@ -38,6 +38,8 @@ var sentences [][]string
 // }
 // Paragraph 0's class is 3, has sentences 1 and 2;
 // Paragraph 1's class is 1, has sentences 1, 2 and 3;
+
+var testingSentences [][]string
 
 type Word struct {
 	Name           string
@@ -70,8 +72,17 @@ type GobShell struct {
 }
 
 var gobFileName string = "trainingdata.gob"
-var verificationFileName string = "dev.txt"
+var testingFileName string = "dev.txt"
 var verificationResultFileName string = "dev_result.txt"
+
+type testingFileOutput struct {
+	EstimatedWeight float64
+	CalculatedClass float64
+	ActualClass     float64
+	Content         string
+}
+
+var output = []testingFileOutput{}
 
 var debug bool = false
 
@@ -87,24 +98,32 @@ func main() {
 	// result verification
 	Verification()
 
+	Score()
+
 	fmt.Println("Program End...")
 }
 
+func Score() {
+	j := 0
+	for _, s := range output {
+		if s.CalculatedClass == s.ActualClass {
+			j++
+		}
+	}
+	fmt.Println("match:", float64(j)/float64(len(output)))
+}
+
 func Verification() {
-	verificationFile, err := os.Open(verificationFileName)
-	Check(err, "verification file could not be opened")
-	defer verificationFile.Close()
+	testingFile, err := os.Open(testingFileName)
+	Check(err, "testing file could not be opened")
+	defer testingFile.Close()
 
 	notALetter := func(char rune) bool { return !unicode.IsLetter(char) }
 	// var output []string
-	type Output struct {
-		Class   float64
-		Content string
-	}
-	output := []Output{}
+
 	var verificationResultClass []float64
 
-	br := bufio.NewReader(verificationFile)
+	br := bufio.NewReader(testingFile)
 	for i := 0; ; i++ {
 		line, _, flag := br.ReadLine()
 		if flag == io.EOF {
@@ -112,6 +131,13 @@ func Verification() {
 		}
 
 		para := string(line)
+
+		t, _ := strconv.Atoi(para[:strings.IndexFunc(para, unicode.IsSpace)])
+		actualClass := float64(t)
+
+		// class := strings.IndexFunc(para, unicode.IsSpace)
+		// // fmt.Println("class: ", para[:class])
+		// // e.g. class:  3
 
 		var class float32 = 0
 		var match int = 0
@@ -126,13 +152,13 @@ func Verification() {
 		}
 		// output = append(output, strconv.FormatFloat(float64(class)/float64(match), 'f', 2, 32)+" "+para)
 		verificationResultClass = append(verificationResultClass, float64(class)/float64(match))
-		output = append(output, Output{Class: float64(class) / float64(match), Content: para})
+		output = append(output, testingFileOutput{EstimatedWeight: float64(class) / float64(match), ActualClass: actualClass, Content: para})
 	}
 
 	// analysis training data's class distribution
 	var trainingDataClassSatatic [5]int
-	for i, _ := range sentences {
-		j, _ := strconv.Atoi(sentences[i][0])
+	for i, _ := range trainingSentences {
+		j, _ := strconv.Atoi(trainingSentences[i][0])
 		switch j {
 		case 0:
 			trainingDataClassSatatic[0]++
@@ -150,7 +176,7 @@ func Verification() {
 	// e.g. [1082 2228 1621 2328 1285]
 	var trainingDataClassPercentage [5]float64
 	for i, _ := range trainingDataClassSatatic {
-		trainingDataClassPercentage[i] = float64(trainingDataClassSatatic[i]) / float64(len(sentences))
+		trainingDataClassPercentage[i] = float64(trainingDataClassSatatic[i]) / float64(len(trainingSentences))
 	}
 	fmt.Println(trainingDataClassPercentage)
 	// e.g. [0.1266385767790262 0.2607677902621723 0.1897237827715356 0.27247191011235955 0.15039794007490637]
@@ -167,22 +193,22 @@ func Verification() {
 	// e.g. [1.851025644938151 2.0055873870849608 2.0936654743395353 2.272305443173363 2.8736173629760744]
 	for i, _ := range output {
 		switch {
-		case output[i].Class < classThreshods[0]:
-			output[i].Content = "0 " + output[i].Content
-		case output[i].Class < classThreshods[1]:
-			output[i].Content = "1 " + output[i].Content
-		case output[i].Class < classThreshods[2]:
-			output[i].Content = "2 " + output[i].Content
-		case output[i].Class < classThreshods[3]:
-			output[i].Content = "3 " + output[i].Content
+		case output[i].EstimatedWeight < classThreshods[0]:
+			output[i].CalculatedClass = 0
+		case output[i].EstimatedWeight < classThreshods[1]:
+			output[i].CalculatedClass = 1
+		case output[i].EstimatedWeight < classThreshods[2]:
+			output[i].CalculatedClass = 2
+		case output[i].EstimatedWeight < classThreshods[3]:
+			output[i].CalculatedClass = 3
 		default:
-			output[i].Content = "4 " + output[i].Content
+			output[i].CalculatedClass = 4
 
 		}
 	}
-	for _, s := range output {
-		fmt.Println(s.Content)
-	}
+	// for _, s := range output {
+	// 	fmt.Println(s.CalculatedClass, s.ActualClass, s.Content)
+	// }
 }
 
 func WordsAnalysis() {
@@ -194,11 +220,11 @@ func WordsAnalysis() {
 	fmt.Println("total words:", totalWordsCount)
 
 	var overallAverageClass float32 = 0
-	for i, _ := range sentences {
-		class, _ := strconv.Atoi(sentences[i][0])
+	for i, _ := range trainingSentences {
+		class, _ := strconv.Atoi(trainingSentences[i][0])
 		overallAverageClass = overallAverageClass + float32(class)
 	}
-	overallAverageClass = overallAverageClass / float32(len(sentences))
+	overallAverageClass = overallAverageClass / float32(len(trainingSentences))
 	fmt.Println("overall average class:", overallAverageClass)
 
 	var words Words
@@ -216,7 +242,7 @@ func WordsAnalysis() {
 
 		var sum int = 0
 		for _, p := range v {
-			class, _ := strconv.Atoi(sentences[p[0]][0])
+			class, _ := strconv.Atoi(trainingSentences[p[0]][0])
 			sum = sum + class
 		}
 		words[i].Class_Average = float32(sum) / float32(len(v))
@@ -243,7 +269,7 @@ func InitializeBaseData() {
 		ReadPracticeData()
 
 		// persistence of train data as structure
-		gobShellSave := GobShell{Words_map: words_map, Sentences: sentences}
+		gobShellSave := GobShell{Words_map: words_map, Sentences: trainingSentences}
 		SaveTrainingDataStruct(gobFileName, gobShellSave)
 		fmt.Println("pre-loaded file doesn't exist")
 	} else {
@@ -251,13 +277,13 @@ func InitializeBaseData() {
 		gobShellload := new(GobShell)
 		LoadTrainDataStruct(gobFileName, gobShellload)
 		words_map = gobShellload.Words_map
-		sentences = gobShellload.Sentences
+		trainingSentences = gobShellload.Sentences
 		fmt.Println("pre-loaded file exists")
 	}
 
 	// fmt.Println(words_mapload)
 	if debug {
-		fmt.Println(sentences)
+		fmt.Println(trainingSentences)
 
 		for key, value := range words_map {
 			fmt.Printf("%s : %d\n", key, value)
@@ -313,13 +339,16 @@ func ReadPracticeData() {
 		//read the paragragh's class
 		class := strings.IndexFunc(para, unicode.IsSpace)
 		// fmt.Println("class: ", para[:class])
+		// e.g. class:  3
 		currentSentence := []string{para[:class]}
 
 		for j, sen := range strings.Split(para, ",") {
 			//read sentence
 			// fmt.Println("Sen ", j+1, ": ", sen)
+			// e.g. Sen  1 :  3 The Rock is destined to be the 21st Century 's new `` Conan '' and that he 's going to make a splash even greater than Arnold Schwarzenegger
+			// e.g. Sen  2 :   Jean-Claud Van Damme or Steven Segal .
 			//finish sentences construction
-			// sentences[i][j+1] = sen
+			// trainingSentences[i][j+1] = sen
 			currentSentence = append(currentSentence, sen)
 
 			for _, word := range strings.FieldsFunc(sen, notALetter) {
@@ -330,7 +359,7 @@ func ReadPracticeData() {
 				words_map[word] = append(words_map[word], [][2]int{{i, j + 1}}...)
 			}
 		}
-		sentences = append(sentences, currentSentence)
+		trainingSentences = append(trainingSentences, currentSentence)
 	}
 
 	// for key, value := range words_map {
