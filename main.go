@@ -34,7 +34,7 @@ type Word struct {
 	// }
 	WordRankOnEmergeTimes [5]float64
 	WordRankOnEmergeRatio [5]float64
-	// Frequency      int
+	Frequency             float64
 	// RateOfFreq     float64
 	// Class_Average  float64
 	// Class_Variance float64
@@ -152,7 +152,7 @@ func Verification() {
 
 			if wordStatisic, ok := words_map[word]; ok {
 				for i := 0; i < len(ratioOfParagraph); i++ {
-					ratioOfParagraph[i] += wordStatisic.WordRankOnEmergeRatio[i]
+					ratioOfParagraph[i] += wordStatisic.WordRankOnEmergeRatio[i] * wordStatisic.Frequency
 				}
 			}
 		}
@@ -248,9 +248,25 @@ func Training() {
 		words_map[name] = word
 	}
 
+	// update word frequency
+	totalWordsCount := 0.0
+	for _, word := range words_map {
+		totalWordsCount = totalWordsCount + float64(len(word.Appearance))
+	}
+	for name, word := range words_map {
+		word.Frequency = float64(len(word.Appearance)) / totalWordsCount
+		words_map[name] = word
+	}
+
+	for _, word := range words_map {
+		if word.Frequency == 0 {
+			fmt.Println(word.Frequency)
+		}
+	}
+
 	// z := 0
 	// for key, value := range words_map {
-	// 	fmt.Printf("%s : %.9f : %.9f \n", key, value.WordRankOnEmergeTimes, value.WordRankOnEmergeRatio)
+	// 	fmt.Printf("%s : %.9f : %.9f \n", key, value.Frequency, value.WordRankOnEmergeRatio)
 	// 	if z > 100 {
 	// 		break
 	// 	}
